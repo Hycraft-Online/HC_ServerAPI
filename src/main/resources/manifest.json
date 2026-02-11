@@ -1,0 +1,12 @@
+{
+  "Group": "${group}",
+  "Name": "${name}",
+  "Version": "${version}",
+  "Description": "${description}",
+  "Authors": [{"Name": "Server Admin"}],
+  "ServerVersion": "${server_version}",
+  "IncludesAssetPack": false,
+  "Dependencies": {},
+  "DisabledByDefault": false,
+  "Main": "${entry_point}"
+}
