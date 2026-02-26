@@ -18,7 +18,6 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -28,6 +27,7 @@ import java.lang.management.MemoryUsage;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -481,7 +481,7 @@ public class HttpService {
                     File procNetDev = new File("/proc/net/dev");
                     if (procNetDev.exists()) {
                         long bytesIn = 0, bytesOut = 0;
-                        try (BufferedReader br = new BufferedReader(new FileReader(procNetDev))) {
+                        try (BufferedReader br = Files.newBufferedReader(procNetDev.toPath())) {
                             String line;
                             while ((line = br.readLine()) != null) {
                                 line = line.trim();
