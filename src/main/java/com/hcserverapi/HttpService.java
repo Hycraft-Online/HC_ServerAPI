@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -43,12 +44,13 @@ import com.hypixel.hytale.logger.HytaleLogger;
 public class HttpService {
 
     private final HttpServer server;
+    private final ExecutorService executor;
     private final String apiKey;
     private final HytaleLogger logger;
 
     // GC tracking
-    private long lastGcCount = 0;
-    private long lastGcTimeMs = 0;
+    private volatile long lastGcCount = 0;
+    private volatile long lastGcTimeMs = 0;
     private volatile long lastPauseDurationMs = 0;
     private volatile long maxPauseMs = 0;
     private volatile long pauseResetTime = System.currentTimeMillis();
@@ -57,7 +59,8 @@ public class HttpService {
         this.apiKey = apiKey;
         this.logger = logger;
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
-        this.server.setExecutor(Executors.newCachedThreadPool());
+        this.executor = Executors.newCachedThreadPool();
+        this.server.setExecutor(this.executor);
         this.server.createContext("/command", new CommandHandler());
         this.server.createContext("/commands", new CommandsHandler());
         this.server.createContext("/health", new HealthHandler());
@@ -81,6 +84,15 @@ public class HttpService {
 
     public void stop() {
         server.stop(2);
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void sendJson(HttpExchange exchange, int code, String json) throws IOException {
@@ -141,7 +153,7 @@ public class HttpService {
                 command = command.substring(1);
             }
 
-            logger.at(Level.INFO).log("API executing command: " + command);
+            logger.at(Level.FINE).log("API executing command: " + command);
 
             try {
                 CompletableFuture<Void> future = CommandManager.get()
@@ -422,7 +434,9 @@ public class HttpService {
                     int chunks = 0;
                     try {
                         chunks = world.getChunkStore().getLoadedChunksCount();
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        logger.at(Level.FINE).log("Failed to get chunk count for world %s: %s", world.getName(), e.getMessage());
+                    }
                     long tick = world.getTick();
 
                     sb.append("{\"name\":\"").append(escapeJson(world.getName())).append("\"")
@@ -501,7 +515,9 @@ public class HttpService {
                           .append(",\"bytesOut\":").append(bytesOut)
                           .append("}");
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.at(Level.FINE).log("Failed to read network stats: %s", e.getMessage());
+                }
 
                 sb.append("}");
                 sendJson(exchange, 200, sb.toString());
